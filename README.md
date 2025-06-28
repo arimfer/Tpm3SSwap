@@ -1,145 +1,190 @@
-
 # SimpleSwap
 
-**SimpleSwap** is a lightweight Automated Market Maker (AMM) protocol inspired by Uniswap V2. It allows users to provide and withdraw liquidity, swap tokens, and calculate token prices using a constant product formula, without relying on any external Uniswap dependencies.
+A minimal **Automated Market Maker (AMM)** smart contract inspired by Uniswap V2, implemented in Solidity without external on-chain dependencies (except OpenZeppelin ERC20 utilities).
+
+## 🚀 Overview
+
+**SimpleSwap** allows users to:
+
+- Add liquidity to a token pair pool and receive LP (Liquidity Provider) tokens.
+- Remove liquidity and receive underlying tokens.
+- Swap tokens using a constant product formula (`x * y = k`), without fees.
+- Query pool prices and expected output amounts.
+
+The contract issues an ERC20 token as the LP token ("Liquidity Token" with symbol "LQT").
 
 ---
 
-## 📦 Contracts
+## ⚖️ Constant Product Formula
 
-### `SimpleSwap.sol`
-Implements the AMM logic.
+The AMM maintains the invariant:
 
-### `LiquidityToken.sol`
-ERC-20 token used to represent liquidity pool shares.
-
----
-
-## 🧩 Features
-
-- Add and remove liquidity from token pairs.
-- Execute token swaps (1-to-1).
-- Track and calculate token prices.
-- Custom LP token per pair (`LiquidityToken`).
-- On-chain reserve tracking.
-
----
-
-## 🔧 Functions
-
-### 🔹 `addLiquidity(...)`
-
-Adds liquidity to a pool. If the pool does not exist, it is created.
-
-```solidity
-function addLiquidity(
-  address tokenA,
-  address tokenB,
-  uint amountADesired,
-  uint amountBDesired,
-  uint amountAMin,
-  uint amountBMin,
-  address to,
-  uint deadline
-) external returns (uint amountA, uint amountB, uint liquidity);
 ```
+x * y = k
+```
+
+Where:
+
+- `x` = reserve of token A
+- `y` = reserve of token B
+- `k` = constant
+
+This ensures that after each swap, liquidity remains balanced without explicit order books.
+
+---
+
+## 🛠️ Deployment
+
+```bash
+# Install dependencies
+npm install
+
+# Compile
+npx hardhat compile
+
+# Deploy (example)
+npx hardhat run scripts/deploy.js --network <network_name>
+```
+
+---
+
+## 💧 Liquidity Functions
+
+### `addLiquidity(...)`
+
+Adds liquidity to the pool.
+
+**Parameters:**
+
+- `tokenA`, `tokenB`: ERC20 token addresses.
+- `amountADesired`, `amountBDesired`: desired amounts to deposit.
+- `amountAMin`, `amountBMin`: minimum amounts to accept (slippage protection).
+- `to`: address receiving LP tokens.
+- `deadline`: timestamp after which the transaction is invalid.
 
 **Returns:**
-- `amountA`: Final amount of tokenA deposited.
-- `amountB`: Final amount of tokenB deposited.
-- `liquidity`: Amount of liquidity tokens minted.
+
+- `amountA`: actual amount of token A deposited.
+- `amountB`: actual amount of token B deposited.
+- `liquidity`: amount of LP tokens minted.
 
 ---
 
-### 🔹 `removeLiquidity(...)`
+### `removeLiquidity(...)`
 
-Removes liquidity from a pool and returns the underlying tokens.
+Removes liquidity and burns LP tokens.
 
-```solidity
-function removeLiquidity(
-  address tokenA,
-  address tokenB,
-  uint liquidity,
-  uint amountAMin,
-  uint amountBMin,
-  address to,
-  uint deadline
-) external returns (uint amountA, uint amountB);
-```
+**Parameters:**
+
+- `tokenA`, `tokenB`: ERC20 token addresses.
+- `liquidity`: amount of LP tokens to burn.
+- `amountAMin`, `amountBMin`: minimum amounts to receive.
+- `to`: address receiving tokens.
+- `deadline`: timestamp after which the transaction is invalid.
 
 **Returns:**
-- `amountA`: Amount of tokenA returned.
-- `amountB`: Amount of tokenB returned.
+
+- `amountA`: amount of token A returned.
+- `amountB`: amount of token B returned.
 
 ---
 
-### 🔹 `swapExactTokensForTokens(...)`
+## 🔄 Swap Function
 
-Swaps an exact amount of one token for another.
+### `swapExactTokensForTokens(...)`
 
-```solidity
-function swapExactTokensForTokens(
-  uint amountIn,
-  uint amountOutMin,
-  address[] calldata path,
-  address to,
-  uint deadline
-) external returns (uint[] memory amounts);
-```
+Swaps an exact amount of input tokens for as many output tokens as possible.
+
+**Parameters:**
+
+- `amountIn`: exact amount of input tokens.
+- `amountOutMin`: minimum acceptable amount of output tokens.
+- `path`: token address array `[tokenIn, tokenOut]`.
+- `to`: recipient address.
+- `deadline`: timestamp after which the transaction is invalid.
 
 **Returns:**
-- `amounts[0]`: Input token amount.
-- `amounts[1]`: Output token amount received.
+
+- `amounts`: array `[amountIn, amountOut]`.
 
 ---
 
-### 🔹 `getPrice(...)`
+## 📈 View Functions
 
-Returns the price of `tokenA` in terms of `tokenB`.
+### `getPrice(tokenA, tokenB)`
 
-```solidity
-function getPrice(address tokenA, address tokenB) external view returns (uint price);
+Returns the price of `tokenA` denominated in `tokenB`, scaled by `1e18`.
+
+---
+
+### `getAmountOut(amountIn, reserveIn, reserveOut)`
+
+Helper function to calculate the expected output amount for a given input and reserves, using the formula:
+
+```
+amountOut = (amountIn * reserveOut) / (reserveIn + amountIn)
 ```
 
 ---
 
-### 🔹 `getAmountOut(...)`
+## ⚡ LP Token
 
-Calculates how much output token is received for a given input.
+- Name: **Liquidity Token**
+- Symbol: **LQT**
+- Follows standard ERC20 behavior.
+
+When you provide liquidity, you receive LP tokens representing your pool share. When you remove liquidity, these tokens are burned.
+
+---
+
+## ✅ Security Notes
+
+- Uses `SafeERC20` from OpenZeppelin for safe token transfers.
+- Reverts if minimum amounts or deadlines are not respected.
+- **⚠️ No swap fees are included (0% fee).** In a production environment, you may want to add a fee mechanism.
+
+---
+
+## 🧪 Testing
+
+We recommend testing with Hardhat or Foundry. Example tests:
+
+- Provide and remove liquidity with different ratios.
+- Perform swaps and validate output amounts.
+- Check price calculation and invariant maintenance (`x * y = k`).
+
+---
+
+## 💬 License
+
+[MIT](LICENSE)
+
+---
+
+## 🤝 Contributions
+
+Feel free to open issues or pull requests to improve the contract or add features (e.g., fees, multi-token paths, advanced math).
+
+---
+
+## 🌐 Author
+
+Built with ❤️ for educational purposes. Inspired by [Uniswap V2](https://uniswap.org/).
+
+---
+
+### Example
 
 ```solidity
-function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) public pure returns (uint amountOut);
+// Add liquidity
+simpleSwap.addLiquidity(tokenA, tokenB, 1000 ether, 2000 ether, 900 ether, 1800 ether, msg.sender, block.timestamp + 600);
+
+// Swap
+address[] memory path = new address[](2);
+path[0] = address(tokenA);
+path[1] = address(tokenB);
+simpleSwap.swapExactTokensForTokens(100 ether, 190 ether, path, msg.sender, block.timestamp + 600);
 ```
 
 ---
 
-## 🪙 LiquidityToken.sol
-
-ERC-20 contract used as LP token. Only the `SimpleSwap` contract can mint or burn it.
-
-### 🔸 `mint(address to, uint amount)`
-Mints LP tokens to a user.
-
-### 🔸 `burn(address from, uint amount)`
-Burns LP tokens from a user.
-
----
-
-## 🛠 Requirements
-
-- Solidity ^0.8.0
-- OpenZeppelin Contracts (`ERC20`, `IERC20`)
-- Compatible with Remix, Hardhat or Foundry
-
----
-
-## 🔐 Security Notes
-
-- Tokens must be approved (`approve()`) before being transferred to the contract.
-- No fees are charged by default; this can be modified in `getAmountOut()`.
-
----
-
-## 📜 License
-
-MIT © 2025
